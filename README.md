@@ -42,7 +42,7 @@ Tạo manifest CSV có 3 cột `image_path,label,user_id`, sau đó:
 python src/06_hagrid.py --manifest data/hagrid_manifest.csv --output data/hagrid_landmarks.csv --extract
 ```
 
-Script chia test theo `user_id` để tránh cùng một người xuất hiện ở cả train và test. Dataset HaGRID có thể có schema/nhãn khác, vì vậy cần map nhãn trong manifest về `next`, `previous`, `play_pause`, `none` trước khi train so sánh.
+Script chia test theo `user_id` để tránh cùng một người xuất hiện ở cả train và test, sau đó train Random Forest và in accuracy/report. Dataset HaGRID có thể có schema/nhãn khác, vì vậy cần map nhãn trong manifest về `next`, `previous`, `play_pause`, `none` trước khi train so sánh.
 
 ## Kiểm thử
 

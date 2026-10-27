@@ -13,7 +13,7 @@ def test_gate_requires_hold_and_cooldown(tmp_path):
     assert gate.update("next", 0.9) is None
     assert gate.update("next", 0.9) == "next"
     with log.open(newline="", encoding="utf-8") as file:
-        assert len(list(csv.reader(file))) == 2
+        assert len(list(csv.reader(file))) == 3
 
 
 def test_gate_rejects_low_confidence():

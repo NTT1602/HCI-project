@@ -25,6 +25,35 @@ python src/05_realtime.py --model models/rf.pkl
 python src/run_gate_realtime.py --model models/rf.pkl
 ```
 
+## Nghiên cứu Midas touch: prediction log và evaluator
+
+Prediction logger ghi kết quả model theo từng frame, nhưng không áp dụng gate. Vì vậy cùng một log có thể được replay qua cả 4 chính sách một cách công bằng.
+
+Mỗi trial là một lần quay riêng. Với lệnh có chủ ý, `--trial-type intentional` và đặt `--intended-action`; với hoạt động nền hoặc near-miss, đặt `--intended-action none`.
+
+Ví dụ quay các trial:
+
+```powershell
+python src/record_predictions.py --model models/rf.pkl --output data/predictions.csv --trial-id intentional-next-01 --trial-type intentional --intended-action next
+python src/record_predictions.py --model models/rf.pkl --output data/predictions.csv --trial-id background-point-01 --trial-type background --intended-action none
+python src/record_predictions.py --model models/rf.pkl --output data/predictions.csv --trial-id near-miss-next-01 --trial-type near_miss --intended-action none
+```
+
+Nhấn `q` để kết thúc từng trial. Logger lưu `confidence`, `second_confidence`, `margin`, `predicted_label` và metadata trial.
+
+Replay cùng log qua C1–C4:
+
+```powershell
+python src/evaluate_policies.py --input data/predictions.csv --output-dir data/evaluation
+```
+
+Kết quả:
+
+- `data/evaluation/policy_summary.csv`: bảng so sánh 4 policy.
+- `data/evaluation/trial_results.csv`: kết quả từng trial.
+- `data/evaluation/policy_events.csv`: các event mà mỗi policy phát ra.
+
+Các metric chính là `false_triggers_per_minute`, `command_miss_rate`, `mean_latency_ms`, `command_success_rate` và `abstention_rate`.
 Ở bước collect, chọn nhãn bằng phím:
 
 - `1`: `next`

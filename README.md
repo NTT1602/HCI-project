@@ -80,16 +80,7 @@ python -m pytest -q
 python -m compileall src tests
 ```
 
-## Tạo GitHub repository
 
-Repo local đã sẵn sàng. Để tạo repo GitHub và push, cài GitHub CLI rồi đăng nhập, sau đó chạy:
-
-```powershell
-gh auth login
-gh repo create hand-gesture-slide-controller --public --source=. --remote=origin --push
-```
-
-Lệnh này cần bạn tự xác thực GitHub; mình không tự lấy hoặc lưu token của bạn.
 
 ## Lưu ý
 

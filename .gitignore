@@ -6,6 +6,7 @@ __pycache__/
 models/*.pkl
 models/*.joblib
 data/raw/
+data/videos/
 data/*.csv
 *.log
 .DS_Store

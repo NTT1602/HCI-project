@@ -73,6 +73,16 @@ python src/06_hagrid.py --manifest data/hagrid_manifest.csv --output data/hagrid
 
 Script chia test theo `user_id` để tránh cùng một người xuất hiện ở cả train và test, sau đó train Random Forest và in accuracy/report. Dataset HaGRID có thể có schema/nhãn khác, vì vậy cần map nhãn trong manifest về `next`, `previous`, `play_pause`, `none` trước khi train so sánh.
 
+## 20BN-JESTER
+
+Tổ chức bộ dữ liệu Jester cho bài toán điều khiển slide (lọc 11 nhãn liên quan: `Swiping Left`, `Swiping Right`, `Stop Sign`, `No gesture`, `Doing other things`, `Thumb Up`, `Thumb Down`, `Zooming In/Out`):
+
+```powershell
+python src/organize_jester.py
+```
+
+Dữ liệu được tổ chức theo cấu trúc chuẩn `train/`, `validation/`, `test/` tại `D:\Data HCI\slide_gestures` kèm file chỉ mục `manifest.csv`.
+
 ## Kiểm thử
 
 ```powershell

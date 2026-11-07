@@ -1,0 +1,18 @@
+Hướng nghiên cứu 1 — Ngưỡng kích hoạt thích ứng theo độ mơ hồ
+Thay vì dùng một ngưỡng kích hoạt cố định cho mọi tình huống, hệ thống có thể yêu cầu mức bằng chứng khác nhau tùy độ rõ ràng của chuỗi cử chỉ. Khi cử chỉ rõ ràng, lệnh có thể được chấp nhận nhanh; khi cử chỉ mơ hồ hoặc dễ trùng với hoạt động nền, hệ thống cần thêm bằng chứng theo thời gian trước khi thực thi.
+•	Tín hiệu có thể khảo sát: độ tin cậy của bộ nhận diện, chênh lệch giữa xác suất của hai lớp đứng đầu, độ ổn định của dự đoán qua các khung hình, vận tốc và quỹ đạo bàn tay.
+•	Baseline: bộ nhận diện với ngưỡng cố định. Phương án thử nghiệm: quy tắc/ngưỡng thích ứng dựa trên độ mơ hồ hoặc tính ổn định theo thời gian; bắt đầu từ cơ chế đơn giản, tránh thêm mô hình phức tạp khi chưa cần thiết.
+•	RQ1: Ngưỡng kích hoạt thích ứng theo độ mơ hồ có giảm false trigger mà không làm tăng đáng kể command miss và latency so với ngưỡng cố định không?
+3.3. Hướng nghiên cứu 2 — Abstention: cho phép hệ thống chưa ra lệnh khi chưa đủ bằng chứng
+Thay vì luôn chọn nhãn có xác suất cao nhất, hệ thống có thêm trạng thái “chưa chắc chắn”. Trong trạng thái này, hệ thống có thể chờ thêm vài khung hình hoặc yêu cầu xác nhận ở những trường hợp rủi ro, thay vì thực thi lệnh ngay.
+•	Trạng thái 1 — Chấp nhận lệnh: bằng chứng đủ mạnh và ổn định.
+•	Trạng thái 2 — Từ chối/không kích hoạt: đầu vào không phù hợp với lệnh hoặc có dấu hiệu là hoạt động nền.
+•	Trạng thái 3 — Chưa chắc chắn: bằng chứng chưa đủ để phân biệt lệnh có chủ ý với hoạt động tự nhiên; tiếp tục quan sát hoặc yêu cầu xác nhận có giới hạn.
+•	Baseline: mô hình luôn chọn lớp có điểm số cao nhất. Phương án thử nghiệm: thêm ngưỡng từ chối dựa trên độ tin cậy/độ mơ hồ và đo tỷ lệ lệnh bị từ chối.
+•	RQ2: Cơ chế abstention có giảm kích hoạt nhầm trong các tình huống mơ hồ, với mức tăng chấp nhận được về lệnh bị bỏ lỡ, tỷ lệ từ chối và độ trễ không?
+3.4. Thiết kế thực nghiệm so sánh
+Nhóm sẽ dùng cùng một bộ nhận diện cử chỉ và so sánh các chính sách quyết định trên các tình huống lệnh có chủ ý, hoạt động nền và near-miss. Các tình huống nền gồm chỉ tay khi giải thích, vung tay, minh họa hình dạng, điều chỉnh quần áo hoặc cầm bút.
+•	Cấu hình 1: nhận diện cử chỉ với ngưỡng cố định, không có cơ chế bổ sung.
+•	Cấu hình 2: ngưỡng kích hoạt thích ứng theo độ mơ hồ.
+•	Cấu hình 3: ngưỡng cố định kết hợp abstention.
+•	Cấu hình 4: kết hợp ngưỡng thích ứng và abstention nếu thời gian cho phép. Đây là cấu hình để kiểm tra tương tác giữa hai cơ chế, không mặc nhiên được 

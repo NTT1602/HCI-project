@@ -45,4 +45,10 @@ class GestureGate:
 
 
 def gesture_to_slide_action(label: str) -> str | None:
-    return {"next": "NEXT SLIDE", "previous": "PREVIOUS SLIDE", "play_pause": "PLAY/PAUSE"}.get(label)
+    return {
+        "next": "NEXT SLIDE",
+        "previous": "PREVIOUS SLIDE",
+        "zoom_in": "ZOOM IN",
+        "zoom_out": "ZOOM OUT",
+        "play_pause": "PLAY/PAUSE",
+    }.get(label)

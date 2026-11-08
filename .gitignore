@@ -8,4 +8,6 @@ models/*.joblib
 data/raw/
 data/*.csv
 *.log
+*.docx
+reports/
 .DS_Store

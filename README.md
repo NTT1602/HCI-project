@@ -83,6 +83,18 @@ python src/organize_jester.py
 
 Dữ liệu được tổ chức theo cấu trúc chuẩn `train/`, `validation/`, `test/` tại `D:\Data HCI\slide_gestures` kèm file chỉ mục `manifest.csv`.
 
+### Trích xuất Landmarks + Vector chuyển động (Option 2)
+
+Trích xuất 63 đặc trưng MediaPipe hand landmarks tại keyframe kết hợp 7 đặc trưng vector chuyển động động học (`dx_wrist`, `dy_wrist`, `dz_wrist`, `dx_index`, `dy_index`, `dz_index`, `speed_wrist`) để phân biệt chính xác cử chỉ vuốt:
+
+```powershell
+# Chạy thử nghiệm nhanh (ví dụ 100 mẫu mỗi nhãn):
+python src/08_jester.py --limit-per-class 100 --output data/jester_landmarks.csv
+
+# Hoặc trích xuất toàn bộ:
+python src/08_jester.py --output data/jester_landmarks.csv
+```
+
 ## Kiểm thử
 
 ```powershell

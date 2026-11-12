@@ -7,5 +7,9 @@ models/*.pkl
 models/*.joblib
 data/raw/
 data/*.csv
+!data/jester_landmarks.csv
+!data/jester_sample.csv
 *.log
+*.docx
+reports/
 .DS_Store

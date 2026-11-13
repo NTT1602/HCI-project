@@ -24,7 +24,11 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from landmark_utils import FEATURE_NAMES, ensure_parent
+FEATURE_NAMES = [f"{axis}{i}" for i in range(21) for axis in ("x", "y", "z")]
+
+
+def ensure_parent(path: str | Path) -> None:
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
 
 # Dynamic motion feature names
 MOTION_FEATURE_NAMES = [
@@ -39,7 +43,7 @@ MOTION_FEATURE_NAMES = [
 
 # Combined feature columns
 ALL_FEATURE_COLUMNS = FEATURE_NAMES + MOTION_FEATURE_NAMES
-METADATA_COLUMNS = ["label", "raw_label", "split", "video_id", "user_id"]
+METADATA_COLUMNS = ["label", "raw_label", "split", "video_id", "user_id", "frame_idx"]
 FULL_HEADER = ALL_FEATURE_COLUMNS + METADATA_COLUMNS
 
 # Mapping Jester classes to Slide Presentation Controller commands
@@ -53,10 +57,10 @@ DEFAULT_SLIDE_MAPPING = {
     "Thumb Down": "none",
     "No gesture": "none",
     "Doing other things": "none",
-    "Zooming In With Full Hand": "none",
-    "Zooming Out With Full Hand": "none",
-    "Zooming In With Two Fingers": "none",
-    "Zooming Out With Two Fingers": "none",
+    "Zooming In With Full Hand": "zoom_in",
+    "Zooming Out With Full Hand": "zoom_out",
+    "Zooming In With Two Fingers": "zoom_in",
+    "Zooming Out With Two Fingers": "zoom_out",
 }
 
 # Thread-local storage for MediaPipe Hands detectors
@@ -82,12 +86,8 @@ def extract_video_features(
     folder_path: str,
     min_confidence: float = 0.3,
     step: int = 3,
-) -> tuple[np.ndarray, np.ndarray] | None:
-    """Extract 63 pose landmarks and 7 motion features from a video folder.
-
-    Returns:
-        (pose_landmarks_63, motion_features_7) or None if no hand detected.
-    """
+) -> list[tuple[int, np.ndarray, np.ndarray]] | None:
+    """Extract one landmark row per sampled frame in a video."""
     frames = sorted(glob.glob(os.path.join(folder_path, "*.jpg")))
     if not frames:
         return None
@@ -112,36 +112,28 @@ def extract_video_features(
     if not detected_entries:
         return None
 
-    first_idx, first_lm = detected_entries[0]
-    last_idx, last_lm = detected_entries[-1]
-    mid_idx_pos = len(detected_entries) // 2
-    _, mid_lm = detected_entries[mid_idx_pos]
-
-    pose_features = mid_lm.reshape(-1)
-
-    wrist_start, wrist_end = first_lm[0], last_lm[0]
-    index_start, index_end = first_lm[8], last_lm[8]
-
-    dx_wrist = float(wrist_end[0] - wrist_start[0])
-    dy_wrist = float(wrist_end[1] - wrist_start[1])
-    dz_wrist = float(wrist_end[2] - wrist_start[2])
-
-    dx_index = float(index_end[0] - index_start[0])
-    dy_index = float(index_end[1] - index_start[1])
-    dz_index = float(index_end[2] - index_start[2])
-
-    frame_diff = max(1, last_idx - first_idx)
-    speed_wrist = float(math.sqrt(dx_wrist**2 + dy_wrist**2) / frame_diff)
-
-    motion_features = np.array(
-        [dx_wrist, dy_wrist, dz_wrist, dx_index, dy_index, dz_index, speed_wrist],
-        dtype=np.float32,
-    )
-
-    return pose_features, motion_features
+    rows = []
+    previous = None
+    for frame_idx, landmarks in detected_entries:
+        if previous is None:
+            motion = np.zeros(len(MOTION_FEATURE_NAMES), dtype=np.float32)
+        else:
+            wrist_delta = landmarks[0] - previous[0]
+            index_delta = landmarks[8] - previous[8]
+            motion = np.array(
+                [
+                    *wrist_delta,
+                    *index_delta,
+                    math.sqrt(float(wrist_delta[0] ** 2 + wrist_delta[1] ** 2)),
+                ],
+                dtype=np.float32,
+            )
+        rows.append((frame_idx, landmarks.reshape(-1), motion))
+        previous = landmarks
+    return rows
 
 
-def process_single_item(item: Any, min_conf: float, step: int) -> dict[str, Any] | None:
+def process_single_item(item: Any, min_conf: float, step: int) -> list[dict[str, Any]] | None:
     """Worker function to process one video entry."""
     raw_label = str(item.label)
     split_name = str(item.split)
@@ -149,9 +141,9 @@ def process_single_item(item: Any, min_conf: float, step: int) -> dict[str, Any]
     folder_path = str(item.folder_path)
     target_label = DEFAULT_SLIDE_MAPPING.get(raw_label, "none")
 
-    features_pair = extract_video_features(folder_path, min_confidence=min_conf, step=step)
+    features = extract_video_features(folder_path, min_confidence=min_conf, step=step)
 
-    if features_pair is None:
+    if features is None:
         if target_label == "none":
             zero_pose = np.zeros(len(FEATURE_NAMES), dtype=np.float32)
             zero_motion = np.zeros(len(MOTION_FEATURE_NAMES), dtype=np.float32)
@@ -162,18 +154,22 @@ def process_single_item(item: Any, min_conf: float, step: int) -> dict[str, Any]
             row_dict["split"] = split_name
             row_dict["video_id"] = video_id
             row_dict["user_id"] = f"jester_{video_id}"
-            return row_dict
+            row_dict["frame_idx"] = -1
+            return [row_dict]
         return None
 
-    pose_feat, motion_feat = features_pair
-    row_dict = dict(zip(FEATURE_NAMES, pose_feat))
-    row_dict.update(dict(zip(MOTION_FEATURE_NAMES, motion_feat)))
-    row_dict["label"] = target_label
-    row_dict["raw_label"] = raw_label
-    row_dict["split"] = split_name
-    row_dict["video_id"] = video_id
-    row_dict["user_id"] = f"jester_{video_id}"
-    return row_dict
+    rows = []
+    for frame_idx, pose_feat, motion_feat in features:
+        row_dict = dict(zip(FEATURE_NAMES, pose_feat))
+        row_dict.update(dict(zip(MOTION_FEATURE_NAMES, motion_feat)))
+        row_dict["label"] = target_label
+        row_dict["raw_label"] = raw_label
+        row_dict["split"] = split_name
+        row_dict["video_id"] = video_id
+        row_dict["user_id"] = f"jester_{video_id}"
+        row_dict["frame_idx"] = frame_idx
+        rows.append(row_dict)
+    return rows
 
 
 def main() -> None:
@@ -198,6 +194,12 @@ def main() -> None:
     existing_video_ids = set()
     if out_file.exists():
         try:
+            existing_header = pd.read_csv(out_file, nrows=0)
+            if "frame_idx" not in existing_header.columns:
+                raise ValueError(
+                    f"{out_file} là CSV format cũ (1 dòng/video). "
+                    "Hãy đổi sang --output data/jester_landmarks_frames.csv."
+                )
             existing_df = pd.read_csv(out_file, usecols=["video_id"])
             existing_video_ids = set(existing_df["video_id"].astype(str))
             print(f"Resuming extraction: Found {len(existing_video_ids)} already extracted in {out_file}")
@@ -254,7 +256,7 @@ def main() -> None:
         for result in pool.map(task, items, chunksize=20):
             processed_count += 1
             if result is not None:
-                extracted_rows.append(result)
+                extracted_rows.extend(result)
             else:
                 skipped_count += 1
 

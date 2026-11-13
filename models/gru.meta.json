@@ -1,0 +1,14 @@
+{
+  "classes": [
+    "next",
+    "none",
+    "previous",
+    "zoom_in",
+    "zoom_out"
+  ],
+  "sequence_length": 16,
+  "data": "data/jester_landmarks.csv",
+  "train_near_miss": false,
+  "jitter": 0.003,
+  "seed": 42
+}

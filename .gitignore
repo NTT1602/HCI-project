@@ -9,6 +9,7 @@ data/raw/
 data/*.csv
 !data/jester_landmarks.csv
 !data/jester_sample.csv
+!data/jester_frames_sample.csv
 *.log
 *.docx
 reports/

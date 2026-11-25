@@ -18,7 +18,7 @@ import pandas as pd
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils.class_weight import compute_class_weight
 
-from jester_data import CLASSES, NONE_LABEL, VideoSet, aligned_inputs, load_videos, stream_windows
+from jester_data import CLASSES, NONE_LABEL, VideoSet, aligned_inputs, load_videos, stream_window_at
 
 
 def build_training_set(
@@ -35,17 +35,17 @@ def build_training_set(
     pre = post = length
     aligned_end = pre + length - 1
     max_shift = max(1, length // 4)
+    total = pre + length + post
     for _ in range(augment):
-        windows = stream_windows(videos.tracks, length, pre, post, jitter, rng)
         ends = aligned_end + rng.integers(-max_shift, max_shift + 1, size=len(videos))
-        inputs.append(windows[np.arange(len(videos)), ends])
+        inputs.append(stream_window_at(videos.tracks, ends, length, pre, post, jitter, rng))
         labels.append(videos.meta["target"].to_numpy())
     if hold_negatives > 0:
         commands = np.flatnonzero(videos.meta["target"].to_numpy() != NONE_LABEL)
         chosen = rng.choice(commands, size=int(len(commands) * hold_negatives), replace=False)
-        windows = stream_windows(videos.tracks[chosen], length, pre, post, jitter, rng)
         # Last frame of the stream: the window only contains the hand held still.
-        inputs.append(windows[:, -1])
+        ends = np.full(len(chosen), total - 1)
+        inputs.append(stream_window_at(videos.tracks[chosen], ends, length, pre, post, jitter, rng))
         labels.append(np.full(len(chosen), NONE_LABEL, dtype=object))
     return np.concatenate(inputs).astype(np.float32), np.concatenate(labels)
 
@@ -81,6 +81,9 @@ def main() -> None:
     parser.add_argument("--jitter", type=float, default=0.003)
     parser.add_argument("--train-near-miss", action="store_true",
                         help="Đưa Thumb Up/Down, Stop Sign vào train như none (mặc định giữ lại để test)")
+    parser.add_argument("--step-ms", type=float, default=None,
+                        help="Thời gian giữa 2 bước chuỗi khi chạy thật. Mặc định: 167 ms (CSV theo frame, "
+                             "Jester 12 fps lấy 1/2) hoặc 125 ms (CSV 1 dòng/video, 16 bước ~ 2 s)")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -130,6 +133,8 @@ def main() -> None:
     meta = {
         "classes": CLASSES,
         "sequence_length": length,
+        "step_ms": args.step_ms or (1000 / 6 if videos.frame_level else 125.0),
+        "frame_level_data": videos.frame_level,
         "data": args.data,
         "train_near_miss": args.train_near_miss,
         "jitter": args.jitter,

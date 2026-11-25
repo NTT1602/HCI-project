@@ -84,6 +84,10 @@ def main() -> None:
                 draw_landmarks(frame, result)
                 if camera_frame % args.frame_step == 0:
                     current_features = extract_two_hand_landmarks(result)
+                    if current_features.any():
+                        # Ảnh webcam đã lật gương, ảnh Jester thì không (Swiping Left có dx > 0):
+                        # lật lại x để hướng vuốt khớp với lúc train.
+                        current_features[0:63:3] = 1.0 - current_features[0:63:3]
                     history.append(add_motion_features(current_features, previous_features))
                     previous_features = current_features
                     window = list(history)

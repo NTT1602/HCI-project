@@ -1,6 +1,6 @@
 import numpy as np
 
-from jester_data import build_streams, scenario_of, synthesize_tracks, target_of
+from jester_data import build_streams, fit_real_timing, scenario_of, synthesize_tracks, target_of
 from sequence_utils import add_motion_features, motion_sequence, sliding_windows
 
 
@@ -46,6 +46,42 @@ def test_sliding_windows_end_at_each_frame():
     assert windows.shape == (1, 5, 3, 1)
     assert windows[0, 0, :, 0].tolist() == [0, 0, 1]
     assert windows[0, 4, :, 0].tolist() == [3, 4, 5]
+
+
+def test_fit_real_timing_keeps_speed():
+    frames = np.arange(5, dtype=np.float32).reshape(5, 1)
+    assert fit_real_timing(frames, 8)[:, 0].tolist() == [0, 1, 2, 3, 4, 4, 4, 4]
+    long = np.arange(20, dtype=np.float32).reshape(20, 1)
+    assert fit_real_timing(long, 16)[:, 0].tolist() == list(range(2, 18))
+
+
+def test_frame_level_csv_is_detected(tmp_path):
+    from jester_data import LANDMARK_COLUMNS, MOTION_COLUMNS, load_videos
+
+    rows = []
+    for video_id, raw in [(1, "Swiping Left"), (2, "No gesture")]:
+        for frame_idx in range(3):
+            row = {c: 0.1 * (frame_idx + 1) for c in LANDMARK_COLUMNS}
+            row.update({c: 0.0 for c in MOTION_COLUMNS})
+            row.update(raw_label=raw, split="train", video_id=video_id, frame_idx=frame_idx * 2)
+            rows.append(row)
+    path = tmp_path / "frames.csv"
+    import pandas as pd
+    pd.DataFrame(rows).to_csv(path, index=False)
+    videos = load_videos(str(path), 4)
+    assert videos.tracks.shape == (2, 4, 63)
+    assert videos.meta["target"].tolist() == ["previous", "none"]
+    np.testing.assert_allclose(videos.tracks[0, :, 0], [0.1, 0.2, 0.3, 0.3], atol=1e-6)
+
+
+def test_stream_window_at_matches_full_windows():
+    from jester_data import stream_window_at, stream_windows
+
+    tracks = np.random.default_rng(3).uniform(0.1, 0.9, size=(4, 6, 63)).astype(np.float32)
+    ends = np.array([0, 5, 9, 13])
+    full = stream_windows(tracks, 6, 3, 5, 0.0, np.random.default_rng(0))
+    picked = stream_window_at(tracks, ends, 6, 3, 5, 0.0, np.random.default_rng(0))
+    np.testing.assert_allclose(picked, full[np.arange(4), ends])
 
 
 def test_stream_layout():

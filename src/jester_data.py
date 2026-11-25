@@ -62,10 +62,11 @@ class VideoSet:
 
     tracks: np.ndarray
     meta: pd.DataFrame  # columns: video_id, raw_label, split, scenario, target
+    frame_level: bool = False  # True: real per-frame trajectories; False: synthesised from 1 row/video
 
     def subset(self, mask: np.ndarray) -> "VideoSet":
         mask = np.asarray(mask, dtype=bool)
-        return VideoSet(self.tracks[mask], self.meta[mask].reset_index(drop=True))
+        return VideoSet(self.tracks[mask], self.meta[mask].reset_index(drop=True), self.frame_level)
 
     def __len__(self) -> int:
         return len(self.meta)
@@ -74,11 +75,17 @@ class VideoSet:
 def load_videos(path: str, length: int) -> VideoSet:
     """Load a Jester landmark CSV into fixed-length landmark tracks."""
     data = pd.read_csv(path)
-    data["scenario"] = data["raw_label"].map(scenario_of)
-    data = data[data["scenario"].notna()].copy()
+    if {"scenario", "label"} <= set(data.columns):
+        # Dữ liệu tự thu (data/real_*.csv, xem data/REAL_DATA_README.md): scenario/label đã gán sẵn, raw_label là
+        # mô tả tình huống ("basic", "lấy đồ vật"...) chứ không phải tên lớp Jester. CSV Jester không có cột scenario.
+        data = data[data["scenario"].isin(["intentional", "background", "near_miss"])].copy()
+        data["target"] = data["label"].fillna(NONE_LABEL).astype(str)
+    else:
+        data["scenario"] = data["raw_label"].map(scenario_of)
+        data = data[data["scenario"].notna()].copy()
+        data["target"] = data["raw_label"].map(target_of)
     if data.empty:
-        raise ValueError(f"{path} không chứa nhãn Jester nào được dùng")
-    data["target"] = data["raw_label"].map(target_of)
+        raise ValueError(f"{path} không chứa nhãn nào được dùng")
     data["video_id"] = data["video_id"].astype(str)
     multi_frame = "frame_idx" in data.columns and data.groupby("video_id").size().max() > 1
     if multi_frame:
@@ -119,8 +126,7 @@ def _frame_level(data: pd.DataFrame, length: int) -> VideoSet:
         frames = video[LANDMARK_COLUMNS].to_numpy(np.float32)
         if "frame_idx" in video and (video["frame_idx"] < 0).all():
             frames = np.zeros((1, LANDMARK_FEATURES), dtype=np.float32)
-        indices = np.linspace(0, len(frames) - 1, length).round().astype(int)
-        tracks.append(frames[indices])
+        tracks.append(fit_real_timing(frames, length))
         first = video.iloc[0]
         rows.append({
             "video_id": video_id,
@@ -129,7 +135,20 @@ def _frame_level(data: pd.DataFrame, length: int) -> VideoSet:
             "scenario": first.scenario,
             "target": first.target,
         })
-    return VideoSet(np.stack(tracks), pd.DataFrame(rows))
+    return VideoSet(np.stack(tracks), pd.DataFrame(rows), frame_level=True)
+
+
+def fit_real_timing(frames: np.ndarray, length: int) -> np.ndarray:
+    """Fit a real frame sequence to ``length`` without changing its speed.
+
+    Longer videos are centre-cropped; shorter ones are padded with the last
+    frame (hand held still), matching the post-gesture part of a stream.
+    """
+    if len(frames) >= length:
+        start = (len(frames) - length) // 2
+        return frames[start:start + length]
+    pad = np.repeat(frames[-1:], length - len(frames), axis=0)
+    return np.concatenate([frames, pad], axis=0)
 
 
 def build_streams(
@@ -165,6 +184,28 @@ def stream_windows(
     """Model inputs for every frame of every simulated stream: (N, L, length, 70)."""
     stream = build_streams(tracks, pre_frames, post_frames, jitter, rng)
     return sliding_windows(motion_sequence(stream), length)
+
+
+def stream_window_at(
+    tracks: np.ndarray,
+    ends: np.ndarray,
+    length: int,
+    pre_frames: int,
+    post_frames: int,
+    jitter: float,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """One model input per stream, the window ending at ``ends[i]``: (N, length, 70).
+
+    Same result as ``stream_windows(...)[arange(N), ends]`` without building
+    every window (which needs N x L x length x 70 floats).
+    """
+    features = motion_sequence(build_streams(tracks, pre_frames, post_frames, jitter, rng))
+    padded = np.concatenate(
+        [np.zeros((len(tracks), length - 1, features.shape[-1]), dtype=features.dtype), features], axis=1
+    )
+    offsets = np.asarray(ends)[:, None] + np.arange(length)[None, :]  # padded index of window frames
+    return padded[np.arange(len(tracks))[:, None], offsets]
 
 
 def aligned_inputs(tracks: np.ndarray) -> np.ndarray:

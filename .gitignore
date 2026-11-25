@@ -14,3 +14,5 @@ data/*.csv
 *.docx
 reports/
 .DS_Store
+data/cache/
+data/zoo_predictions/

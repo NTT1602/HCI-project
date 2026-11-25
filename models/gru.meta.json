@@ -7,7 +7,9 @@
     "zoom_out"
   ],
   "sequence_length": 16,
-  "data": "data/jester_landmarks.csv",
+  "step_ms": 166.66666666666666,
+  "frame_level_data": true,
+  "data": "data/jester_landmarks_frames.csv",
   "train_near_miss": false,
   "jitter": 0.003,
   "seed": 42

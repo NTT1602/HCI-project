@@ -26,6 +26,30 @@ python src/run_pipeline.py --skip-train # dùng lại models/gru.keras
 | 2. Mô phỏng luồng camera trên tập test: không tay → cử chỉ → giữ tay yên, log prediction từng frame | `src/06_simulate_stream.py` | `data/predictions.csv` |
 | 3. Chạy cùng log qua C1 fixed, C2 adaptive, C3 fixed+abstention, C4 adaptive+abstention | `src/evaluate_policies.py` | `reports/evaluation/policy_summary.csv`, `threshold_sweep.csv`, `trial_results.csv`, `policy_events.csv` |
 
+## Thực nghiệm: so sánh model + chỉnh tham số C1–C4 cho khớp hệ thống thật
+
+```powershell
+python src/09_compare_models.py            # train 7 kiến trúc (cửa sổ 16) + GRU cửa sổ 12/10, mô phỏng luồng val/test
+python src/10_tune_policies.py             # quét tham số C1–C4 trên validation, chọn theo ngân sách kích hoạt nhầm, chạy test 1 lần
+python src/11_summarize_experiments.py     # -> reports/EXPERIMENTS_RESULTS.md + reports/tradeoff_policies.png
+```
+
+| Bước | Script | Đầu ra |
+|---|---|---|
+| Model: `gru` (gốc), `gru_small`, `lstm`, `bigru`, `tcn`, `attention`, `mlp` (`src/model_zoo.py`), cùng dữ liệu/seed/augment với `04_train_gru.py` | `src/09_compare_models.py` | `models/zoo/<run>.keras` (+ labels/meta, copy sang app như `gru.keras`), `reports/models/classifier_summary.csv`, `data/zoo_predictions/<run>_{validation,test}.csv` |
+| Chỉnh tham số trên validation, báo cáo test + bootstrap CI 95% | `src/10_tune_policies.py` | `reports/tuning/selected.csv`, `app_defaults.csv`, `bootstrap_ci.csv`, `<run>_val_grid.csv` |
+
+Khớp với app HCI-Slideshow-Interaction:
+
+- `--commands next,previous` (mặc định khi chỉnh tham số): zoom gộp vào `none`, video zoom thành **near-miss** (cử chỉ có chủ ý nhưng không phải lệnh), giống app đã bỏ zoom.
+- Thời gian theo bước model (6 fps, 167 ms/bước). Chặn chiều ngược 2.5 s (`reverse_block_frames`) và mô phỏng việc app
+  reset GRU sau mỗi lệnh (`repeat_block_frames` = độ dài cửa sổ) bật cho **mọi** cấu hình.
+- Abstention C3/C4 (`src/policies.py`) cùng thiết kế với app: còn nghi ngờ (dưới ngưỡng / dưới `clear_threshold` / margin thấp /
+  chiều vuốt ngược vừa xuất hiện) thì quan sát thêm tối đa `abstain_wait_frames`, hết hạn vẫn không rõ thì từ chối.
+  Bản cũ chỉ đổi tên reject (fixed == fixed_abstention ở mọi chỉ số). C1/C2 giữ nguyên kết quả cũ (đã đối chiếu, lệch 0).
+- Chọn tham số công bằng: với mỗi ngân sách kích hoạt nhầm (1/2/3% trial không phải lệnh; mọi cấu hình trên Jester đều < 4.5% nên 5–10% không ràng buộc), lấy cấu hình có tỉ lệ
+  "đúng lệnh, không kèm lệnh sai" cao nhất trên **validation**; test chỉ chạy một lần với cấu hình đã chọn.
+
 Kịch bản (`src/jester_data.py`):
 
 - **intentional**: Swiping Left/Right, Zooming In/Out → lệnh.

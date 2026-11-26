@@ -12,7 +12,7 @@ Mục tiêu đề tài (RQ1 ngưỡng thích ứng, RQ2 abstention, 4 cấu hìn
   `tests/test_jester_data.py`, model). Sửa tối thiểu, ưu tiên thêm file mới.
 - Console Windows dùng cp1252: script in tiếng Việt phải `sys.stdout.reconfigure(encoding="utf-8")` hoặc chạy với `PYTHONIOENCODING=utf-8`.
 - Đa tiến trình (`ProcessPoolExecutor`) chỉ chạy từ file `.py`, không chạy từ `python - <<EOF` (Windows spawn cần đường dẫn script).
-- Test: `python -m pytest -q tests` (23 test, đều pass).
+- Test: `python -m pytest -q tests` (42 test, đều pass).
 - Train trên Windows chỉ chạy CPU (TF ≥ 2.11 không có GPU trên Windows). GPU (RTX 3050 4 GB) dùng qua WSL2 Ubuntu, đã cài 2026-11-25:
   `/root/hci-gpu` (Python 3.12, `tensorflow[and-cuda]==2.16.2`, keras 3.15.1). Chạy: `wsl -d Ubuntu`, `source ~/hci-gpu/bin/activate`,
   `export TF_FORCE_GPU_ALLOW_GROWTH=true`, rồi gọi script như thường. Trong WSL, `infer_ms` đo trên GPU (app chạy CPU) -> đo lại trên Windows.
@@ -34,6 +34,8 @@ Mục tiêu đề tài (RQ1 ngưỡng thích ứng, RQ2 abstention, 4 cấu hìn
 | `src/11_summarize_experiments.py` | -> `reports/EXPERIMENTS_RESULTS.md`, `reports/tradeoff_policies.png`. |
 | `src/scale_augment.py` | `shrink_tracks`: co tọa độ tay 1..k lần + dịch vị trí (giả lập đứng xa) cho `--far-scale`. |
 | `src/13_sweep_real_threshold.py` | Quét ngưỡng × giữ (C1) trên dữ liệu tự thu cho danh sách model. |
+| `src/policy_variants.py` | `VariantPolicy`: C1–C4 mở rộng để thí nghiệm, mặc định giống hệt `policies.py`. |
+| `src/14_policy_experiments.py` | Thí nghiệm tham số C2/C3 trên phiên Jester dài + dữ liệu thật (`predict` rồi `run`; `run` ghi đè CSV). |
 | `src/12_eval_real.py` | Đánh giá model trên **dữ liệu tự thu**: 6 video dài chạy như luồng liên tục + 61 clip near-miss -> `reports/real/`. |
 | `src/05_realtime_gru.py` | Demo realtime cũ của repo (lấy 1/4 khung = 7.5 fps — xem "Vấn đề đã biết"). |
 | `src/01_*, 02_*, 07_*, 08_jester.py, organize_jester.py` | Webcam, vẽ landmark, chuẩn bị/trích Jester (`08_jester.py --step 2` -> 6 fps). |
@@ -81,6 +83,10 @@ Copy sang app: 3 file vào `HCI-Slideshow-Interaction/models/gru/` với tên `g
   -> `models/zoo/*_far.keras`. Trên Jester gần bất biến tỉ lệ (×4: 90% so với 49–60% của model cũ). Trên dữ liệu thật trúng 6–11 -> 11–16/29
   (người 2: 2 -> 6–9/20) nhưng nhầm 2–4 -> 87–133 lần/17 phút (chủ yếu video xa của người 2). Ở cùng mức nhầm thì **không hơn model cũ**
   (quét ngưỡng: `src/13_sweep_real_threshold.py`). App vẫn dùng `bigru_L16`. Bước tiếp: fine-tune với cử động nói thật ở xa làm lớp none.
+
+**Tham số C2/C3 (2026-11-25, 5 model)** — `reports/POLICY_PARAM_EXPERIMENTS.md`: cửa sổ ổn định và dải ngưỡng C2 không có tác dụng (lịch sử bị xóa);
+C2 gốc không hơn C1; C3 hơn C1 1.6–4.3 điểm trên Jester, nhưng "dung sai khung rớt" giúp C1 xấp xỉ C3 ở 3/5 model. Trên pipeline app + dữ liệu thật
+chưa thấy khác biệt; `clear_conf` cao (tốt trên Jester) làm sót vuốt ở session webcam.
 
 ## Vấn đề đã biết
 
